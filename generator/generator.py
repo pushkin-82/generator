@@ -14,6 +14,7 @@ class Generator:
         self.schema_path = schema_path
         self.tables = []
         self.additional_fields = []
+        self.triggers = []
         self.data = None
 
     def read_schema(self):
@@ -44,6 +45,36 @@ class Generator:
         table = table.lower()
         self.additional_fields.append(f'ALTER TABLE {table} ADD COLUMN {table}_{new_field} {new_field_type.upper()};\n')
 
+    def create_trigger_updated(self, table):
+        func_name = 'update_{table}_timestamp()'.format(table=table.lower())
+        trigger = (
+            'CREATE FUNCTION {func_name}\n'
+            'RETURNS TRIGGER AS $$\n'
+            'BEGIN\n'
+            '  NEW.{table}_updated = now()\n'
+            '  RETURN NEW;\n'
+            'END;\n'
+            '$$ language ''plpgsql'';\n'
+            'CREATE TRIGGER trig_{table}_updated AFTER UPDATE ON {table} FOR EACH ROW EXECUTE FUNCTION {func_name};\n'
+        ).format(func_name=func_name, table=table.lower())
+
+        self.triggers.append(trigger)
+
+    def create_trigger_created(self, table):
+        func_name = 'create_{table}_timestamp()'.format(table=table.lower())
+        trigger = (
+            'CREATE FUNCTION {func_name}\n'
+            'RETURNS TRIGGER AS $$\n'
+            'BEGIN\n'
+            '  NEW.{table}_created = now()\n'
+            '  RETURN NEW;\n'
+            'END;\n'
+            '$$ language ''plpgsql'';\n'
+            'CREATE TRIGGER trig_{table}_updated AFTER INSERT ON {table} FOR EACH ROW EXECUTE FUNCTION {func_name};\n'
+        ).format(func_name=func_name, table=table.lower())
+
+        self.triggers.append(trigger)
+
     def timestamps(self):
         """Add fields "created" and "updated" to tables in data"""
 
@@ -58,6 +89,8 @@ class Generator:
             f.write('\n'.join(self.tables))
             f.write('\n')
             f.write('\n'.join(self.additional_fields))
+            f.write('\n')
+            f.write('\n'.join(self.triggers))
 
     def generate(self):
         """Generate file with statements"""
@@ -69,9 +102,22 @@ class Generator:
 
         self.timestamps()
 
+        for table in self.data.keys():
+            self.create_trigger_updated(table)
+            self.create_trigger_created(table)
+
         self.write_to_file()
 
 
 if __name__ == '__main__':
     g = Generator('schema.yaml')
     g.generate()
+
+# CREATE OR REPLACE FUNCTION update_user_timestamp()
+# RETURNS TRIGGER AS $$
+# BEGIN
+#    NEW.user_updated = cast(extract(epoch from now()) as integer);
+#    RETURN NEW;
+# END;
+# $$ language 'plpgsql';
+# CREATE TRIGGER "tr_user_updated" BEFORE UPDATE ON "user" FOR EACH ROW EXECUTE PROCEDURE update_user_timestamp();
