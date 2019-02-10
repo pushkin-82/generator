@@ -54,7 +54,7 @@ class Generator:
             '  NEW.{table}_updated = now()\n'
             '  RETURN NEW;\n'
             'END;\n'
-            '$$ language ''plpgsql'';\n'
+            '$$ language \'plpgsql\';\n'
             'CREATE TRIGGER trig_{table}_updated AFTER UPDATE ON {table} FOR EACH ROW EXECUTE FUNCTION {func_name};\n'
         ).format(func_name=func_name, table=table.lower())
 
@@ -69,7 +69,7 @@ class Generator:
             '  NEW.{table}_created = now()\n'
             '  RETURN NEW;\n'
             'END;\n'
-            '$$ language ''plpgsql'';\n'
+            '$$ language \'plpgsql\';\n'
             'CREATE TRIGGER trig_{table}_updated AFTER INSERT ON {table} FOR EACH ROW EXECUTE FUNCTION {func_name};\n'
         ).format(func_name=func_name, table=table.lower())
 
